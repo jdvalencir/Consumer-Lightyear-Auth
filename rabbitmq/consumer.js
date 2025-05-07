@@ -122,7 +122,7 @@ class RabbitMQConsumer {
                     }
 
                     // Validate the citizen using the external service
-                    const urlValidate = `http://mrpotato-adapter-service.mrpotato-adapter.svc.cluster.local/v1/adapter/validateCitizen${data.id}`
+                    const urlValidate = `http://mrpotato-adapter-service.mrpotato-adapter.svc.cluster.local/v1/adapter/validateCitizen/${data.id}`
                     const headersValidate = {
                         'Content-Type': 'application/json',
                     }

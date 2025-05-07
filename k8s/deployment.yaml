@@ -22,10 +22,7 @@ spec:
         - containerPort: 3000
         env:
         - name: FIREBASE_API_KEY
-          valueFrom:
-            secretKeyRef:
-              name: firebase-credentials
-              key: firebase.json
+          value: /secrets/firebase/firebase.json
         - name: RMQ_USER
           value: "marciano"
         - name: RMQ_PASS
@@ -61,3 +58,11 @@ spec:
           requests:
             cpu: "50m"
             memory: "100Mi"
+        volumeMounts:
+          - name: firebase-credentials-volume
+            mountPath: /secrets/firebase
+            readOnly: true
+      volumes:
+      - name: firebase-credentials-volume
+        secret:
+          secretName: firebase-credentials

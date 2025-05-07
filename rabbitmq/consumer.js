@@ -190,8 +190,8 @@ class RabbitMQConsumer {
                     this.publish('notifications', {
                         action: 'register-user',
                         passwordUrl: resetUrl,
-                        userId: user.id,
-                        email: email,
+                        name: fullName,
+                        to_email: email,
                     })
                     this.channel.ack(msg)
                 } catch (error) {

@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: consumer-lightyear-auth
+  labels:
+    app: consumer-lightyear-auth
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: consumer-lightyear-auth
+  template:
+    metadata:
+      labels:
+        app: consumer-lightyear-auth
+    spec:
+      containers:
+      - name: consumer-lightyear-auth
+        image: julianv08/consumer-lightyear-auth:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 3000
+        env:
+        - name: FIREBASE_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: my-firebase
+              key: FIREBASE_API_KEY
+        - name: RMQ_USER
+          value: "marciano"
+        - name: RMQ_PASS
+          valueFrom:
+            secretKeyRef:
+              name: my-rabbitmq
+              key: rabbitmq-password
+        - name: RMQ_HOST
+          value: "my-rabbitmq.rabbitmq-ns.svc.cluster.local"
+        - name: RMQ_PORT
+          value: "5672"
+        - name: DB_NAME
+          value: "marcianos"
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: my-db
+              key: DB_USER
+        - name: DB_PASS
+          valueFrom:
+            secretKeyRef:
+              name: my-db
+              key: DB_PASS
+        - name: DB_HOST
+          valueFrom:
+            secretKeyRef:
+              name: my-db
+              key: DB_HOST
+        resources:
+          limits:
+            cpu: "50m"
+            memory: "100Mi"
+          requests:
+            cpu: "50m"
+            memory: "100Mi"

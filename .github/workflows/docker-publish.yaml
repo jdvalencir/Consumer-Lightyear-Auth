@@ -1,0 +1,81 @@
+name: Build and Deploy to GKE
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  PROJECT_ID: ${{ secrets.GKE_PROJECT }}
+  GKE_CLUSTER: marcianos-cluster   # cluster name
+  GKE_ZONE: us-central1-a  # cluster zone
+  IMAGE_NAME: consumer-lightyear-auth # image name
+  DEPLOYMENT_NAME: consumer-lightyear-auth # deployment name
+  NAMESPACE: lightyear-auth
+
+jobs:
+  generate-version:
+    runs-on: ubuntu-22.04
+    permissions:
+        contents: write
+    outputs:
+        new_tag: ${{ steps.bump-version.outputs.new_tag }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+            fetch-depth: '0'
+      - name: Bump version and push tag
+        id: bump-version
+        uses: anothrNick/github-tag-action@1.64.0
+        env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            WITH_V: false
+            MAJOR_STRING_TOKEN: "release("
+            MINOR_STRING_TOKEN: "feat("
+            PATCH_STRING_TOKEN: "fix("
+            DEFAULT_BUMP: minor
+  setup-build-publish-deploy:
+    needs: generate-version
+    name: Setup, Build, Publish, and Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    # Setup gcloud CLI
+    - id: 'auth'
+      uses: 'google-github-actions/auth@v0'
+      with:
+        credentials_json: '${{ secrets.GKE_SA_KEY }}'
+
+    # Get the GKE credentials so we can deploy to the cluster
+    - name: Set up GKE credentials
+      uses: google-github-actions/get-gke-credentials@v0
+      with:
+        cluster_name: ${{ env.GKE_CLUSTER }}
+        location: ${{ env.GKE_ZONE }}
+
+    - name: Login to Docker Hub
+      uses: docker/login-action@v1
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_TOKEN  }}
+
+    - name: Build ${{ env.IMAGE_NAME }} and publish to Docker Hub
+      uses: docker/build-push-action@v2
+      with:
+        context: .
+        file: ./Dockerfile
+        push: true
+        tags: julianv08/${{ env.IMAGE_NAME }}:latest, julianv08/${{ env.IMAGE_NAME }}:${{ needs.generate-version.outputs.new_tag }}
+
+    # Deploy the Docker image to the GKE cluster
+    - name: Deploy
+      run: |-
+        kubectl set image deployment/${{ env.DEPLOYMENT_NAME }} ${{ env.DEPLOYMENT_NAME }}=julianv08/${{ env.IMAGE_NAME }}:${{ needs.generate-version.outputs.new_tag }} -n ${{ env.NAMESPACE }}
+        kubectl rollout status deployment/${{ env.DEPLOYMENT_NAME }} -n ${{ env.NAMESPACE }}
+    - name: Check deployment success
+      run: |
+        while [[ $(kubectl get deployment/${{ env.DEPLOYMENT_NAME }} -n ${{ env.NAMESPACE }} -o 'jsonpath={..status.conditions[?(@.type=="Available")].status}') != "True" ]]; do sleep 5; done
+        while [[ $(kubectl get pods -l app=${{ env.DEPLOYMENT_NAME }} -n ${{ env.NAMESPACE }} -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}') != "True" ]]; do sleep 5; done

@@ -24,7 +24,7 @@ spec:
         - name: FIREBASE_API_KEY
           valueFrom:
             secretKeyRef:
-              name: my-firebase
+              name: firebase-credentials
               key: firebase.json
         - name: RMQ_USER
           value: "marciano"

@@ -146,8 +146,8 @@ class RabbitMQConsumer {
                     const user = await User.create({
                         id: firebaseUser.uid,
                         documentType: data?.documentType,
-                        idNumber: data.id,
-                        names: fullName,
+                        documentNumber: data.id,
+                        name: fullName,
                         email: email,
                         phone: data?.phone || null,
                         country: data?.country || null,

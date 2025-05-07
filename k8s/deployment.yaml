@@ -51,6 +51,8 @@ spec:
             secretKeyRef:
               name: my-db
               key: DB_HOST
+        - name: DB_PORT
+          value: "5432"
         resources:
           limits:
             cpu: "50m"

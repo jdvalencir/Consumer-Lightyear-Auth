@@ -67,12 +67,18 @@ class RabbitMQConsumer {
                         where: {
                             idNumber: data.idNumber,
                         },
-                    })                    
+                    })
                     logger.info(`User deleted from DB: ${user}`)
 
+                    this.publish('notifications', {
+                        "action": "transfer_success",
+                        "to_email": user.email
+                    })
+                    logger.info(`Send notification to user`)
                     this.channel.ack(msg)
                 } catch (error) {
                     logger.error('Error processing delete user message:', error)
+
                     return this.channel.ack(msg) 
                 }
             })

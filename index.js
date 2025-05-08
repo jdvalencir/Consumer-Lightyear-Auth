@@ -16,7 +16,7 @@ async function main() {
 
         await rabbitMQConsumer.connect()
         await rabbitMQConsumer.consume('registration-queue')
-        await rabbitMQConsumer.consumeDeleteUser('delete-user-queue')
+        await rabbitMQConsumer.consumeDeleteUser('delete_data_transferred_user_queue')
         logger.info('Consumer started')
     } catch (error) {
         logger.error('Error:', error);

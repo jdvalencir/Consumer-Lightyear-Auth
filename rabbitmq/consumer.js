@@ -51,7 +51,7 @@ class RabbitMQConsumer {
           // Delete the user from Firebase
           const user = await User.findOne({
             where: {
-              idNumber: data.idNumber,
+              documentNumber: data.id.toString(),
             },
           });
 
@@ -60,14 +60,14 @@ class RabbitMQConsumer {
             await admin.auth().deleteUser(user.id);
             logger.info(`User deleted from Firebase: ${user.id}`);
           } else {
-            logger.error(`User not found in Firebase: ${data.idNumber}`);
-            throw new Error(`User not found in Firebase: ${data.idNumber}`);
+            logger.error(`User not found in Firebase: ${data.id}`);
+            throw new Error(`User not found in Firebase: ${data.id}`);
           }
 
           // Delete the user from the database
           await User.destroy({
             where: {
-              idNumber: data.idNumber,
+              documentNumber: data.id.toString(),
             },
           });
           logger.info(`User deleted from DB: ${user}`);

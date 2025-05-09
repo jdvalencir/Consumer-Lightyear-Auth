@@ -147,7 +147,6 @@ class RabbitMQConsumer {
                         throw new Error(`Citizen is not valid: ${responseValidateCitizen.status} - ${responseValidateCitizen.statusText}`)
                     }
 
-
                     // Create the user in the database
                     const user = await User.create({
                         id: firebaseUser.uid,
@@ -214,6 +213,121 @@ class RabbitMQConsumer {
             })
         } catch (error) {
             logger.error('RabbitMQ consume error:', error)
+        }
+    }
+
+    async consumeRegisterCitizen(queue) {
+        try {
+            await this.channel.assertQueue(queue, { durable: true });
+            this.channel.consume(queue, async (msg) => {
+                if (!msg) return;
+
+                try {
+                    const data = JSON.parse(msg.content.toString());
+                    const { id, citizenName, citizenEmail, urlDocuments, confirmAPI } = data;
+
+                    logger.info(`Received message to register citizen: id=${id}, name=${citizenName}, email=${citizenEmail}`);
+
+                    // Create user in Firebase
+                    const firebaseUser = await admin.auth().createUser({
+                        email: citizenEmail,
+                    });
+                    
+                    logger.info(`User created with email: ${citizenEmail}`);
+
+                    // Generate password reset link
+                    let resetUrl = "";
+                    try {
+                        resetUrl = await admin.auth().generatePasswordResetLink(citizenEmail);
+                        logger.info(`Password reset link generated: ${resetUrl}`);
+                        logger.info(`Password reset email sent to ${citizenEmail}`);
+                    } catch (error) {
+                        logger.error(`Error sending password reset email to ${citizenEmail}:`, error);
+                    }
+
+                    // Validate the citizen using the external service
+                    const urlValidate = `http://mrpotato-adapter-service.mrpotato-adapter.svc.cluster.local/v1/adapter/validateCitizen/${id}`;
+                    const headersValidate = {
+                        'Content-Type': 'application/json',
+                    };
+
+                    const responseValidateCitizen = await axios.get(urlValidate, {
+                        headers: headersValidate,
+                    });
+
+                    logger.info(`Response from validate citizen: ${responseValidateCitizen.status}`);
+
+                    if (responseValidateCitizen.status === 204) {
+                        logger.info(`Citizen is valid: ${responseValidateCitizen.status}`);
+                    } else {
+                        logger.error(`Citizen is not valid: ${responseValidateCitizen.status} - ${responseValidateCitizen.statusText}`);
+                        throw new Error(`Citizen is not valid: ${responseValidateCitizen.status} - ${responseValidateCitizen.statusText}`);
+                    }
+
+                    // Create the user in the database
+                    const user = await User.create({
+                        id: firebaseUser.uid,
+                        documentType: 'CC', // Default document type
+                        documentNumber: id,
+                        name: citizenName,
+                        email: citizenEmail,
+                    });
+
+                    logger.info(`User created in DB: ${user.id}`);
+
+                    // Register the citizen in the external service
+                    const url = `http://mrpotato-adapter-service.mrpotato-adapter.svc.cluster.local/v1/adapter/registerCitizen`;
+                    const body = {
+                        id: id,
+                        name: citizenName,
+                        email: citizenEmail,
+                        operatorId: "681466aaedee130015720b44",
+                        operatorName: "Operador Marcianos"
+                    };
+
+                    const headers = {
+                        'Content-Type': 'application/json',
+                    };
+
+                    const response = await axios.post(url, body, {
+                        headers: headers,
+                    });
+
+                    logger.info(`Response from register citizen: ${response.status}`);
+
+                    if (response.status === 201 && response.data.registered) {
+                        logger.info(`Citizen registered successfully: ${response.data.registered}`);
+                    } else {
+                        logger.error(`Failed to register citizen: ${response.status} - ${response.statusText}`);
+                        throw new Error(`Failed to register citizen: ${response.status} - ${response.statusText}`);
+                    }
+
+                    // Send notification
+                    this.publish('notifications', {
+                        action: 'register-user',
+                        passwordUrl: resetUrl,
+                        name: citizenName,
+                        to_email: citizenEmail,
+                    });
+
+                    // Forward the same payload to the receive_data_transferred_docs_queue
+                    await this.publish('receive_data_transferred_docs_queue', data);
+                    logger.info(`Payload forwarded to receive_data_transferred_docs_queue`);
+
+                    this.channel.ack(msg);
+                } catch (error) {
+                    // Log the specific Firebase error if available
+                    if (error.code && error.message) {
+                        logger.error(`Firebase Error (${error.code}): ${error.message}`);
+                    } else {
+                        logger.error('Error processing register citizen message:', error);
+                    }
+                    // Acknowledge the message even if processing fails
+                    return this.channel.ack(msg);
+                }
+            });
+        } catch (error) {
+            logger.error('RabbitMQ consume error:', error);
         }
     }
 

@@ -308,6 +308,7 @@ class RabbitMQConsumer {
               id: id,
               name: citizenName,
               email: citizenEmail,
+              address: "Medellin", // Default address
               operatorId: "681466aaedee130015720b44",
               operatorName: "Operador Marcianos",
             };
@@ -319,23 +320,24 @@ class RabbitMQConsumer {
             const response = await axios.post(url, body, {
               headers: headers,
             });
+
+            if (response.status === 201 && response.data.registered) {
+              logger.info(
+                `Citizen registered successfully: ${response.data.registered}`
+              );
+            } else {
+              logger.error(
+                `Failed to register citizen: ${response.status} - ${response.statusText}`
+              );
+              throw new Error(
+                `Failed to register citizen: ${response.status} - ${response.statusText}`
+              );
+            }
+
             logger.info(`Response from register citizen: ${response.status}`);
           } catch (error) {
             logger.error(`Error registering citizen: ${error}`);
             throw new Error(`Error registering citizen: ${error}`);
-          }
-
-          if (response.status === 201 && response.data.registered) {
-            logger.info(
-              `Citizen registered successfully: ${response.data.registered}`
-            );
-          } else {
-            logger.error(
-              `Failed to register citizen: ${response.status} - ${response.statusText}`
-            );
-            throw new Error(
-              `Failed to register citizen: ${response.status} - ${response.statusText}`
-            );
           }
 
           // Send notification
